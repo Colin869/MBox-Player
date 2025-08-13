@@ -1,0 +1,9 @@
+pillow
+pygame
+opencv-python
+mutagen
+requests
+python-vlc
+
+# Note: VLC media player must be installed on the system for video playback
+# Download from: https://www.videolan.org/
