@@ -4,7 +4,7 @@ A modern, customizable media center application inspired by Windows Media Center
 
 ## Features
 
-- **Modern Dark Theme**: Sleek dark interface with green accents
+- **Classic WMC Design**: Authentic Windows Media Center interface with dark blue theme
 - **Media Library Management**: Add, organize, and manage your media files
 - **Audio Playback**: Full support for MP3, WAV, FLAC, M4A, and OGG files
 - **Video Playback**: Full support for MP4, AVI, MKV, MOV, WMV, FLV, and WebM files (requires VLC)
@@ -75,11 +75,12 @@ Mbox Player/
 
 ## Customization
 
-The application uses a dark theme with green accents. You can customize the appearance by modifying the color values in `main.py`:
+The application uses the classic Windows Media Center color scheme. You can customize the appearance by modifying the color values in `main.py`:
 
-- Background: `#1a1a1a` (dark gray)
-- Secondary background: `#2a2a2a` (lighter gray)
-- Accent color: `#00ff88` (bright green)
+- Background: `#1a1a2e` (dark blue)
+- Panel background: `#16213e` (lighter blue)
+- Accent color: `#0f3460` (blue accent)
+- Highlight color: `#e94560` (red highlight)
 - Text: `white`
 
 ## Technical Details

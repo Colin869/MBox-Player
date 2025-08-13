@@ -19,7 +19,15 @@ class MboxPlayer:
         self.root = root
         self.root.title("Mbox Player - Media Center")
         self.root.geometry("1200x800")
-        self.root.configure(bg='#1a1a1a')
+        
+        # WMC-style colors
+        self.bg_color = '#1a1a2e'  # Dark blue background
+        self.panel_color = '#16213e'  # Slightly lighter blue for panels
+        self.accent_color = '#0f3460'  # Blue accent
+        self.text_color = 'white'
+        self.highlight_color = '#e94560'  # Red highlight for selection
+        
+        self.root.configure(bg=self.bg_color)
         
         # Initialize pygame mixer for audio
         pygame.mixer.init()
@@ -29,143 +37,285 @@ class MboxPlayer:
         self.is_playing = False
         self.media_list = []
         self.current_index = 0
+        self.current_category = "Music"  # Default category
         
         # Create GUI
         self.create_gui()
         self.load_settings()
         
     def create_gui(self):
-        # Main container
-        main_frame = tk.Frame(self.root, bg='#1a1a1a')
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        # Main container with WMC-style layout
+        main_frame = tk.Frame(self.root, bg=self.bg_color)
+        main_frame.pack(fill=tk.BOTH, expand=True)
         
-        # Title
-        title_label = tk.Label(main_frame, text="MBOX PLAYER", 
-                              font=('Arial', 24, 'bold'), 
-                              fg='#00ff88', bg='#1a1a1a')
-        title_label.pack(pady=(0, 20))
+        # Top navigation bar (WMC style)
+        nav_frame = tk.Frame(main_frame, bg=self.panel_color, height=60)
+        nav_frame.pack(fill=tk.X, pady=(0, 2))
+        nav_frame.pack_propagate(False)
         
-        # Content area
-        content_frame = tk.Frame(main_frame, bg='#2a2a2a', relief=tk.RAISED, bd=2)
-        content_frame.pack(fill=tk.BOTH, expand=True)
+        # Back button (WMC style)
+        back_btn = tk.Button(nav_frame, text="←", font=('Arial', 16, 'bold'),
+                            bg=self.panel_color, fg=self.text_color,
+                            relief=tk.FLAT, bd=0, padx=20, pady=10,
+                            command=self.go_back)
+        back_btn.pack(side=tk.LEFT, padx=10)
         
-        # Left panel - Media library
-        left_panel = tk.Frame(content_frame, bg='#2a2a2a', width=300)
-        left_panel.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 10))
-        left_panel.pack_propagate(False)
+        # Title (WMC style)
+        title_label = tk.Label(nav_frame, text="MBOX PLAYER", 
+                              font=('Arial', 20, 'bold'), 
+                              fg=self.text_color, bg=self.panel_color)
+        title_label.pack(side=tk.LEFT, padx=20)
         
-        # Library controls
-        library_frame = tk.Frame(left_panel, bg='#2a2a2a')
-        library_frame.pack(fill=tk.X, pady=(10, 5))
+        # Main content area
+        content_frame = tk.Frame(main_frame, bg=self.bg_color)
+        content_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
         
-        tk.Button(library_frame, text="Add Media", 
-                 command=self.add_media, 
-                 bg='#00ff88', fg='black', font=('Arial', 10, 'bold'),
-                 relief=tk.FLAT, padx=20, pady=5).pack(side=tk.LEFT, padx=5)
+        # Left side - Categories (WMC style)
+        categories_frame = tk.Frame(content_frame, bg=self.bg_color, width=400)
+        categories_frame.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 20))
+        categories_frame.pack_propagate(False)
         
-        tk.Button(library_frame, text="Clear All", 
-                 command=self.clear_library, 
-                 bg='#ff4444', fg='white', font=('Arial', 10, 'bold'),
-                 relief=tk.FLAT, padx=20, pady=5).pack(side=tk.LEFT, padx=5)
+        # Categories title
+        cat_title = tk.Label(categories_frame, text="MEDIA CATEGORIES", 
+                            font=('Arial', 16, 'bold'), 
+                            fg=self.text_color, bg=self.bg_color)
+        cat_title.pack(pady=(0, 20))
         
-        # Media list
-        list_frame = tk.Frame(left_panel, bg='#2a2a2a')
-        list_frame.pack(fill=tk.BOTH, expand=True, pady=5)
+        # Category buttons (WMC style)
+        self.categories = ["Music", "Pictures + Videos", "Extras", "Settings"]
+        self.category_buttons = {}
         
-        tk.Label(list_frame, text="Media Library", 
-                font=('Arial', 12, 'bold'), 
-                fg='#00ff88', bg='#2a2a2a').pack()
+        for category in self.categories:
+            btn = tk.Button(categories_frame, text=category, 
+                           font=('Arial', 14, 'bold'),
+                           bg=self.bg_color, fg=self.text_color,
+                           relief=tk.FLAT, bd=0, padx=20, pady=15,
+                           anchor=tk.W, width=25,
+                           command=lambda cat=category: self.select_category(cat))
+            btn.pack(fill=tk.X, pady=2)
+            self.category_buttons[category] = btn
         
-        self.media_listbox = tk.Listbox(list_frame, bg='#333333', fg='white',
-                                       selectbackground='#00ff88', 
-                                       selectforeground='black',
-                                       font=('Arial', 10), height=20)
-        self.media_listbox.pack(fill=tk.BOTH, expand=True, pady=5)
-        self.media_listbox.bind('<Double-Button-1>', self.play_selected)
+        # Right side - Content area
+        self.content_area = tk.Frame(content_frame, bg=self.bg_color)
+        self.content_area.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
         
-        # Right panel - Player
-        right_panel = tk.Frame(content_frame, bg='#2a2a2a')
-        right_panel.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+        # Initialize with Music category
+        self.select_category("Music")
         
-        # Now playing info
-        self.now_playing_frame = tk.Frame(right_panel, bg='#2a2a2a')
-        self.now_playing_frame.pack(fill=tk.X, pady=10)
+        # Bottom control bar (WMC style)
+        control_frame = tk.Frame(main_frame, bg=self.panel_color, height=80)
+        control_frame.pack(fill=tk.X, side=tk.BOTTOM)
+        control_frame.pack_propagate(False)
         
-        self.now_playing_label = tk.Label(self.now_playing_frame, 
-                                         text="No media selected", 
-                                         font=('Arial', 14, 'bold'), 
-                                         fg='#00ff88', bg='#2a2a2a')
-        self.now_playing_label.pack()
+        # Control buttons (WMC style)
+        controls_inner = tk.Frame(control_frame, bg=self.panel_color)
+        controls_inner.pack(expand=True)
         
-        # Video display area
-        self.video_frame = tk.Frame(right_panel, bg='#000000', height=400)
-        self.video_frame.pack(fill=tk.BOTH, expand=True, pady=10)
-        self.video_frame.pack_propagate(False)
+        # Playlist button
+        playlist_btn = tk.Button(controls_inner, text="📋", font=('Arial', 12),
+                                bg=self.panel_color, fg=self.text_color,
+                                relief=tk.FLAT, bd=0, padx=10, pady=5)
+        playlist_btn.pack(side=tk.LEFT, padx=5)
         
-        # Controls
-        controls_frame = tk.Frame(right_panel, bg='#2a2a2a')
-        controls_frame.pack(fill=tk.X, pady=10)
+        # Volume controls
+        vol_minus = tk.Button(controls_inner, text="−", font=('Arial', 12, 'bold'),
+                             bg=self.panel_color, fg=self.text_color,
+                             relief=tk.FLAT, bd=0, padx=8, pady=5)
+        vol_minus.pack(side=tk.LEFT, padx=5)
         
-        # Progress bar
-        self.progress_var = tk.DoubleVar()
-        self.progress_bar = ttk.Progressbar(controls_frame, 
-                                           variable=self.progress_var,
-                                           maximum=100, length=400)
-        self.progress_bar.pack(pady=5)
+        vol_plus = tk.Button(controls_inner, text="+", font=('Arial', 12, 'bold'),
+                            bg=self.panel_color, fg=self.text_color,
+                            relief=tk.FLAT, bd=0, padx=8, pady=5)
+        vol_plus.pack(side=tk.LEFT, padx=5)
         
-        # Control buttons
-        button_frame = tk.Frame(controls_frame, bg='#2a2a2a')
-        button_frame.pack(pady=10)
+        # Playback controls
+        stop_btn = tk.Button(controls_inner, text="⏹", font=('Arial', 14),
+                            bg=self.panel_color, fg=self.text_color,
+                            relief=tk.FLAT, bd=0, padx=10, pady=5,
+                            command=self.stop_media)
+        stop_btn.pack(side=tk.LEFT, padx=10)
         
-        self.play_button = tk.Button(button_frame, text="▶ Play", 
-                                    command=self.play_pause, 
-                                    bg='#00ff88', fg='black', 
-                                    font=('Arial', 12, 'bold'),
-                                    relief=tk.FLAT, padx=20, pady=10)
-        self.play_button.pack(side=tk.LEFT, padx=5)
+        prev_btn = tk.Button(controls_inner, text="⏮", font=('Arial', 14),
+                            bg=self.panel_color, fg=self.text_color,
+                            relief=tk.FLAT, bd=0, padx=10, pady=5,
+                            command=self.previous_track)
+        prev_btn.pack(side=tk.LEFT, padx=5)
         
-        tk.Button(button_frame, text="⏮ Previous", 
-                 command=self.previous_track, 
-                 bg='#444444', fg='white', 
-                 font=('Arial', 12, 'bold'),
-                 relief=tk.FLAT, padx=20, pady=10).pack(side=tk.LEFT, padx=5)
+        self.play_button = tk.Button(controls_inner, text="▶", font=('Arial', 18, 'bold'),
+                                    bg=self.highlight_color, fg='white',
+                                    relief=tk.FLAT, bd=0, padx=15, pady=5,
+                                    command=self.play_pause)
+        self.play_button.pack(side=tk.LEFT, padx=10)
         
-        tk.Button(button_frame, text="⏭ Next", 
-                 command=self.next_track, 
-                 bg='#444444', fg='white', 
-                 font=('Arial', 12, 'bold'),
-                 relief=tk.FLAT, padx=20, pady=10).pack(side=tk.LEFT, padx=5)
+        next_btn = tk.Button(controls_inner, text="⏭", font=('Arial', 14),
+                            bg=self.panel_color, fg=self.text_color,
+                            relief=tk.FLAT, bd=0, padx=10, pady=5,
+                            command=self.next_track)
+        next_btn.pack(side=tk.LEFT, padx=5)
         
-        tk.Button(button_frame, text="⏹ Stop", 
-                 command=self.stop_media, 
-                 bg='#ff4444', fg='white', 
-                 font=('Arial', 12, 'bold'),
-                 relief=tk.FLAT, padx=20, pady=10).pack(side=tk.LEFT, padx=5)
-        
-        # Volume control
-        volume_frame = tk.Frame(controls_frame, bg='#2a2a2a')
-        volume_frame.pack(pady=5)
-        
-        tk.Label(volume_frame, text="Volume:", 
-                font=('Arial', 10), 
-                fg='white', bg='#2a2a2a').pack(side=tk.LEFT)
-        
+        # Volume slider
         self.volume_var = tk.DoubleVar(value=70)
-        self.volume_scale = tk.Scale(volume_frame, from_=0, to=100, 
-                                    orient=tk.HORIZONTAL, 
-                                    variable=self.volume_var,
-                                    bg='#2a2a2a', fg='white',
-                                    highlightbackground='#2a2a2a',
-                                    command=self.set_volume)
-        self.volume_scale.pack(side=tk.LEFT, padx=10)
+        volume_scale = tk.Scale(controls_inner, from_=0, to=100, 
+                               orient=tk.HORIZONTAL, 
+                               variable=self.volume_var,
+                               bg=self.panel_color, fg=self.text_color,
+                               highlightbackground=self.panel_color,
+                               command=self.set_volume,
+                               length=150)
+        volume_scale.pack(side=tk.LEFT, padx=20)
         
         # Status bar
         self.status_var = tk.StringVar(value="Ready")
         status_bar = tk.Label(self.root, textvariable=self.status_var, 
                              relief=tk.SUNKEN, anchor=tk.W,
-                             bg='#333333', fg='#00ff88')
+                             bg=self.panel_color, fg=self.text_color,
+                             font=('Arial', 10))
         status_bar.pack(side=tk.BOTTOM, fill=tk.X)
         
+    def select_category(self, category):
+        """Switch between media categories"""
+        self.current_category = category
+        
+        # Update button highlights
+        for cat, btn in self.category_buttons.items():
+            if cat == category:
+                btn.configure(bg=self.highlight_color, fg='white')
+            else:
+                btn.configure(bg=self.bg_color, fg=self.text_color)
+        
+        # Clear content area
+        for widget in self.content_area.winfo_children():
+            widget.destroy()
+        
+        # Create category-specific content
+        if category == "Music":
+            self.create_music_content()
+        elif category == "Pictures + Videos":
+            self.create_video_content()
+        elif category == "Extras":
+            self.create_extras_content()
+        elif category == "Settings":
+            self.create_settings_content()
+    
+    def create_music_content(self):
+        """Create music category content"""
+        # Title
+        title = tk.Label(self.content_area, text="MUSIC LIBRARY", 
+                        font=('Arial', 18, 'bold'), 
+                        fg=self.text_color, bg=self.bg_color)
+        title.pack(pady=(0, 20))
+        
+        # Add music button
+        add_btn = tk.Button(self.content_area, text="Add Music Files", 
+                           font=('Arial', 12, 'bold'),
+                           bg=self.highlight_color, fg='white',
+                           relief=tk.FLAT, padx=20, pady=10,
+                           command=self.add_media)
+        add_btn.pack(pady=10)
+        
+        # Music list
+        list_frame = tk.Frame(self.content_area, bg=self.bg_color)
+        list_frame.pack(fill=tk.BOTH, expand=True, pady=10)
+        
+        self.media_listbox = tk.Listbox(list_frame, bg=self.panel_color, fg=self.text_color,
+                                       selectbackground=self.highlight_color, 
+                                       selectforeground='white',
+                                       font=('Arial', 12), height=15)
+        self.media_listbox.pack(fill=tk.BOTH, expand=True)
+        self.media_listbox.bind('<Double-Button-1>', self.play_selected)
+        
+        # Now playing info
+        self.now_playing_label = tk.Label(self.content_area, 
+                                         text="No music selected", 
+                                         font=('Arial', 14), 
+                                         fg=self.text_color, bg=self.bg_color)
+        self.now_playing_label.pack(pady=10)
+        
+        # Progress bar
+        self.progress_var = tk.DoubleVar()
+        self.progress_bar = ttk.Progressbar(self.content_area, 
+                                           variable=self.progress_var,
+                                           maximum=100, length=400)
+        self.progress_bar.pack(pady=5)
+    
+    def create_video_content(self):
+        """Create video category content"""
+        # Title
+        title = tk.Label(self.content_area, text="PICTURES + VIDEOS", 
+                        font=('Arial', 18, 'bold'), 
+                        fg=self.text_color, bg=self.bg_color)
+        title.pack(pady=(0, 20))
+        
+        # Video grid (placeholder)
+        grid_frame = tk.Frame(self.content_area, bg=self.bg_color)
+        grid_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Picture library
+        pic_frame = tk.Frame(grid_frame, bg=self.panel_color, width=200, height=150)
+        pic_frame.pack(side=tk.LEFT, padx=10, pady=10)
+        pic_frame.pack_propagate(False)
+        
+        tk.Label(pic_frame, text="Picture Library", 
+                font=('Arial', 12, 'bold'), 
+                fg=self.text_color, bg=self.panel_color).pack(pady=20)
+        
+        # Video library
+        vid_frame = tk.Frame(grid_frame, bg=self.panel_color, width=200, height=150)
+        vid_frame.pack(side=tk.LEFT, padx=10, pady=10)
+        vid_frame.pack_propagate(False)
+        
+        tk.Label(vid_frame, text="Video Library", 
+                font=('Arial', 12, 'bold'), 
+                fg=self.text_color, bg=self.panel_color).pack(pady=20)
+        
+        # Add media button
+        add_btn = tk.Button(self.content_area, text="Add Media Files", 
+                           font=('Arial', 12, 'bold'),
+                           bg=self.highlight_color, fg='white',
+                           relief=tk.FLAT, padx=20, pady=10,
+                           command=self.add_media)
+        add_btn.pack(pady=10)
+    
+    def create_extras_content(self):
+        """Create extras category content"""
+        title = tk.Label(self.content_area, text="EXTRAS", 
+                        font=('Arial', 18, 'bold'), 
+                        fg=self.text_color, bg=self.bg_color)
+        title.pack(pady=(0, 20))
+        
+        # Extras options
+        extras = ["Play Favorites", "Media Info", "Equalizer", "Playlists"]
+        
+        for extra in extras:
+            btn = tk.Button(self.content_area, text=extra, 
+                           font=('Arial', 14, 'bold'),
+                           bg=self.bg_color, fg=self.text_color,
+                           relief=tk.FLAT, bd=0, padx=20, pady=15,
+                           anchor=tk.W, width=25)
+            btn.pack(fill=tk.X, pady=2)
+    
+    def create_settings_content(self):
+        """Create settings category content"""
+        title = tk.Label(self.content_area, text="SETTINGS", 
+                        font=('Arial', 18, 'bold'), 
+                        fg=self.text_color, bg=self.bg_color)
+        title.pack(pady=(0, 20))
+        
+        # Settings options
+        settings = ["Audio Settings", "Video Settings", "Interface Settings", "About"]
+        
+        for setting in settings:
+            btn = tk.Button(self.content_area, text=setting, 
+                           font=('Arial', 14, 'bold'),
+                           bg=self.bg_color, fg=self.text_color,
+                           relief=tk.FLAT, bd=0, padx=20, pady=15,
+                           anchor=tk.W, width=25)
+            btn.pack(fill=tk.X, pady=2)
+    
+    def go_back(self):
+        """Go back to previous screen (placeholder)"""
+        messagebox.showinfo("Navigation", "Back button functionality coming soon!")
+    
     def add_media(self):
         """Add media files to the library"""
         filetypes = [
@@ -188,15 +338,6 @@ class MboxPlayer:
         
         self.save_settings()
         self.status_var.set(f"Added {len(files)} media files")
-    
-    def clear_library(self):
-        """Clear all media from the library"""
-        if messagebox.askyesno("Clear Library", "Are you sure you want to clear all media?"):
-            self.media_list.clear()
-            self.media_listbox.delete(0, tk.END)
-            self.stop_media()
-            self.save_settings()
-            self.status_var.set("Library cleared")
     
     def play_selected(self, event=None):
         """Play the selected media file"""
@@ -233,7 +374,7 @@ class MboxPlayer:
             pygame.mixer.music.load(file_path)
             pygame.mixer.music.play()
             self.is_playing = True
-            self.play_button.config(text="⏸ Pause")
+            self.play_button.config(text="⏸", bg=self.highlight_color)
             self.update_progress()
         except Exception as e:
             messagebox.showerror("Error", f"Could not play audio: {str(e)}")
@@ -251,12 +392,12 @@ class MboxPlayer:
             if vlc_available:
                 # VLC implementation would go here
                 self.is_playing = True
-                self.play_button.config(text="⏸ Pause")
+                self.play_button.config(text="⏸", bg=self.highlight_color)
                 self.status_var.set(f"Video playback with VLC (not fully implemented)")
             else:
                 # Show a placeholder for video files when VLC is not available
                 self.is_playing = True
-                self.play_button.config(text="⏸ Pause")
+                self.play_button.config(text="⏸", bg=self.highlight_color)
                 self.status_var.set(f"Video playback requires VLC media player to be installed")
                 messagebox.showinfo("Video Playback", 
                                   "Video playback requires VLC media player to be installed.\n"
@@ -272,7 +413,7 @@ class MboxPlayer:
         if self.is_playing:
             pygame.mixer.music.pause()
             self.is_playing = False
-            self.play_button.config(text="▶ Play")
+            self.play_button.config(text="▶", bg=self.highlight_color)
             self.status_var.set("Paused")
         else:
             if self.current_media is None:
@@ -280,7 +421,7 @@ class MboxPlayer:
             else:
                 pygame.mixer.music.unpause()
                 self.is_playing = True
-                self.play_button.config(text="⏸ Pause")
+                self.play_button.config(text="⏸", bg=self.highlight_color)
                 self.status_var.set("Playing")
     
     def stop_media(self):
@@ -288,7 +429,7 @@ class MboxPlayer:
         pygame.mixer.music.stop()
         self.is_playing = False
         self.current_media = None
-        self.play_button.config(text="▶ Play")
+        self.play_button.config(text="▶", bg=self.highlight_color)
         self.progress_var.set(0)
         self.status_var.set("Stopped")
     
@@ -330,9 +471,10 @@ class MboxPlayer:
                     self.volume_var.set(settings.get('volume', 70))
                     
                     # Update listbox
-                    for file_path in self.media_list:
-                        filename = os.path.basename(file_path)
-                        self.media_listbox.insert(tk.END, filename)
+                    if hasattr(self, 'media_listbox'):
+                        for file_path in self.media_list:
+                            filename = os.path.basename(file_path)
+                            self.media_listbox.insert(tk.END, filename)
         except Exception as e:
             print(f"Error loading settings: {e}")
     
@@ -354,7 +496,7 @@ def main():
     
     # Set window icon and make it resizable
     root.resizable(True, True)
-    root.minsize(800, 600)
+    root.minsize(1000, 700)
     
     # Start the application
     root.mainloop()
